@@ -28,8 +28,8 @@ jobs:
           go-version: '1.23'
           cache: true
 
-      - name: Install Fyne CLI
-        run: go install fyne.io/fyne/v2/cmd/fyne@latest
+      - name: Install NEW Fyne CLI
+        run: go install fyne.io/tools/cmd/fyne@latest
 
       - name: Install MinGW (for Windows)
         if: matrix.os == 'windows'
@@ -44,13 +44,17 @@ jobs:
           VERSION: ${{ github.ref_name }}
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
-          # Используем имя без пробелов для исполняемого файла, 
-          # чтобы избежать проблем с CLI, путями и загрузкой с GitHub
+          
           fyne package -os ${{ matrix.os }} \
             -name "stm23-nor-programmer" \
             -appVersion ${VERSION#v} \
-            -release \
-            -out ${{ matrix.artifact }}
+            -release
+          
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            mv "dist/windows/stm23-nor-programmer.exe" "${{ matrix.artifact }}"
+          else
+            mv "dist/linux/stm23-nor-programmer" "${{ matrix.artifact }}"
+          fi
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
