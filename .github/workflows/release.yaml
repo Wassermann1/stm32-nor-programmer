@@ -74,7 +74,7 @@ jobs:
           if [ "${{ matrix.os }}" = "windows" ]; then
             mv "stm23-nor-programmer.exe" "${{ matrix.artifact }}"
           else
-            mv "stm23-nor-programmer" "${{ matrix.artifact }}"
+            mv "stm23-nor-programmer.tar.xz" "${{ matrix.artifact }}"
           fi
 
       - name: Upload Artifact
@@ -104,9 +104,9 @@ jobs:
             
             ## Binaries
             - `stm23-nor-programmer-${{ github.ref_name }}-windows.exe`
-            - `stm23-nor-programmer-${{ github.ref_name }}-linux`
+            - `stm23-nor-programmer-${{ github.ref_name }}-linux.tar.xz`
           files: |
             stm23-nor-programmer-*.exe
-            stm23-nor-programmer-*
+            stm23-nor-programmer-*.tar.xz
           draft: false
           prerelease: false
