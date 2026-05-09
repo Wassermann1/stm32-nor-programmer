@@ -1,0 +1,6 @@
+[Details]
+Icon = "static/icon.png"
+Name = "STM23 NOR Programmer"
+ID = "com.stm32-progger"
+Version = "0.1.0"
+Build = 2
