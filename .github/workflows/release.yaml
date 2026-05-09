@@ -48,7 +48,7 @@ jobs:
           # чтобы избежать проблем с CLI, путями и загрузкой с GitHub
           fyne package -os ${{ matrix.os }} \
             -name "stm23-nor-programmer" \
-            -app-version ${VERSION#v} \
+            -appVersion ${VERSION#v} \
             -release \
             -out ${{ matrix.artifact }}
 
