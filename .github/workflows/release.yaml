@@ -69,12 +69,12 @@ jobs:
             -release
 
           echo "Contents of dist/:"
-          ls -R dist/
+          ls -R 
           
           if [ "${{ matrix.os }}" = "windows" ]; then
-            mv "dist/windows/stm23-nor-programmer.exe" "${{ matrix.artifact }}"
+            mv "stm23-nor-programmer.exe" "${{ matrix.artifact }}"
           else
-            mv "dist/linux/stm23-nor-programmer" "${{ matrix.artifact }}"
+            mv "stm23-nor-programmer" "${{ matrix.artifact }}"
           fi
 
       - name: Upload Artifact
