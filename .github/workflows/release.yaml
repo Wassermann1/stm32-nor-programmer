@@ -45,6 +45,8 @@ jobs:
             libxrandr-dev \
             libxcursor-dev \
             libxinerama-dev \
+            libxkbcommon-dev \
+            libxkbcommon-x11-dev \
             pkg-config
 
       - name: Install MinGW (for Windows)
@@ -65,6 +67,9 @@ jobs:
             -name "stm23-nor-programmer" \
             -app-version ${VERSION#v} \
             -release
+
+          echo "Contents of dist/:"
+          ls -R dist/
           
           if [ "${{ matrix.os }}" = "windows" ]; then
             mv "dist/windows/stm23-nor-programmer.exe" "${{ matrix.artifact }}"
