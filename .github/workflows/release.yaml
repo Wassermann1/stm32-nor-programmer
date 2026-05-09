@@ -104,9 +104,9 @@ jobs:
             
             ## Binaries
             - `stm23-nor-programmer-${{ github.ref_name }}-windows.exe`
-            - `stm23-nor-programmer-${{ github.ref_name }}-linux.tar.xz`
+            - `stm23-nor-programmer-${{ github.ref_name }}-linux`
           files: |
             stm23-nor-programmer-*.exe
-            stm23-nor-programmer-*.tar.xz
+            stm23-nor-programmer-*
           draft: false
           prerelease: false
