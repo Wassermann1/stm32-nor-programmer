@@ -47,7 +47,7 @@ jobs:
           
           fyne package -os ${{ matrix.os }} \
             -name "stm23-nor-programmer" \
-            -app-veersion ${VERSION#v} \
+            -app-version ${VERSION#v} \
             -release
           
           if [ "${{ matrix.os }}" = "windows" ]; then
