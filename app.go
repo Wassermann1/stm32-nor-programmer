@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
+	"log"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -150,17 +152,37 @@ func updateFlashDisplay() {
 		flashLabel.SetText(flash.Name)
 		flashLabel.Importance = widget.SuccessImportance
 
-		// Подставляем картинку по модели
 		if path, ok := flashImageMap[flash.Name]; ok {
-			flashImage.File = path
-			flashImage.Resource = nil
+			// 🔥 Загружаем ресурс из embed
+			resource, err := loadEmbeddedImage(path)
+			if err != nil {
+				log.Printf("Warning: could not load image %s: %v", path, err)
+				flashImage.Resource = theme.NewThemedResource(theme.QuestionIcon())
+			} else {
+				flashImage.Resource = resource
+			}
+			flashImage.FillMode = canvas.ImageFillContain
+			flashImage.ScaleMode = canvas.ImageScaleSmooth
 		} else {
-			// Если модели нет в маппинге — показываем заглушку или скрываем
-			flashImage.File = ""
-			flashImage.Resource = nil
+			// Модель не в маппинге — заглушка
+			flashImage.Resource = theme.NewThemedResource(theme.QuestionIcon())
 		}
 	}
 
 	flashLabel.Refresh()
 	flashImage.Refresh()
+}
+
+func loadEmbeddedImage(path string) (fyne.Resource, error) {
+	if cached, ok := flashImageCache[path]; ok {
+		return cached, nil
+	}
+	data, err := res.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read embedded file %s: %w", path, err)
+	}
+
+	resource := fyne.NewStaticResource(path, data)
+	flashImageCache[path] = resource
+	return resource, nil
 }

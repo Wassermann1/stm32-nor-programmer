@@ -44,6 +44,7 @@ var (
 		"Excel Semiconductor ES29LV800DB": "static/ES29LV800.png",
 		"Toshiba TV005700002":             "static/TV005700002.png",
 	}
+	flashImageCache = make(map[string]fyne.Resource)
 )
 
 var (
