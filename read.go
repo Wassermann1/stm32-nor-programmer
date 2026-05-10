@@ -15,24 +15,20 @@ import (
 )
 
 func ReadDumpBinary(w fyne.Window) {
-	// === Предварительные проверки (в главном потоке) ===
 	if Port == nil {
-		dialog.ShowError(fmt.Errorf("ERROR: Port not open"), w)
+		dialog.ShowError(fmt.Errorf("port not open"), w)
 		return
 	}
-
 	flash, err := CurrentFlash.Get()
 	if err != nil || flash == nil {
-		dialog.ShowError(fmt.Errorf("ERROR: Connect supported NOR first"), w)
+		dialog.ShowError(fmt.Errorf("connect supported NOR first"), w)
 		return
 	}
 
-	// === Показываем блокирующее окно с прогрессом ===
 	progBar := widget.NewProgressBar()
 	progBar.Min = 0
 	progBar.Max = 1
 	progBar.Value = 0
-
 	statusLabel := widget.NewLabel("📥 Preparing to read...")
 	statusLabel.TextStyle.Monospace = true
 
@@ -45,9 +41,8 @@ func ReadDumpBinary(w fyne.Window) {
 	progressDialog.Resize(fyne.NewSize(400, 150))
 	progressDialog.Show()
 
-	// === Запускаем чтение в фоне ===
-	progChan := make(chan progressUpdate, 10) // буферизированный канал
-	resultChan := make(chan readResult, 1)    // канал для результата + данных
+	progChan := make(chan progressUpdate, 10)
+	resultChan := make(chan readResult, 1)
 
 	go func() {
 		dump, err := doReadDumpBinary(flash.Capacity, progChan)
@@ -55,22 +50,20 @@ func ReadDumpBinary(w fyne.Window) {
 		close(progChan)
 	}()
 
-	// === Обработчик обновлений прогресса ===
 	go func() {
 		for {
 			select {
 			case upd, ok := <-progChan:
 				if !ok {
-					return // канал закрыт
+					return
 				}
-				// Обновляем UI только через fyne.Do
 				fyne.Do(func() {
 					progBar.SetValue(upd.progress)
 					if upd.status != "" {
 						statusLabel.SetText(upd.status)
 					}
 				})
-			case <-time.After(10 * time.Minute): // таймаут на всю операцию
+			case <-time.After(10 * time.Minute):
 				fyne.Do(func() {
 					progressDialog.Dismiss()
 					dialog.ShowError(fmt.Errorf("read operation timeout"), w)
@@ -80,7 +73,6 @@ func ReadDumpBinary(w fyne.Window) {
 		}
 	}()
 
-	// === Ожидание завершения операции ===
 	go func() {
 		result := <-resultChan
 
@@ -91,7 +83,6 @@ func ReadDumpBinary(w fyne.Window) {
 				log.Println("Read error:", result.err)
 				dialog.ShowError(result.err, w)
 			} else {
-				// 🔥 Сохраняем данные в binding (это потокобезопасно)
 				if err := tableData.Set(result.data); err != nil {
 					dialog.ShowError(fmt.Errorf("error storing dump: %w", err), w)
 					return
@@ -105,33 +96,26 @@ func ReadDumpBinary(w fyne.Window) {
 	}()
 }
 
-// doReadDumpBinary выполняет чтение и отправляет прогресс в канал
-// Можно вызывать из любой горутины, не работает с UI напрямую
 func doReadDumpBinary(capacity int, progChan chan<- progressUpdate) ([]byte, error) {
 	if Port == nil {
 		return nil, fmt.Errorf("port not open")
 	}
 
 	log.Printf("Starting dump, expecting %d bytes of data", capacity)
-
 	reader := bufio.NewReader(Port)
-	dump := make([]byte, 0, capacity) // предвыделение памяти
-
-	// Отправляем команду чтения
+	dump := make([]byte, 0, capacity)
 	cmd := fmt.Sprintf("read_full %d\r\n", capacity)
 	if _, err := Port.Write([]byte(cmd)); err != nil {
 		return nil, fmt.Errorf("send command: %w", err)
 	}
 
-	// === 1️⃣ Ждём маркер старта ===
-	deadline := time.Now().Add(30 * time.Second) // таймаут на ожидание старта
+	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
 				return nil, fmt.Errorf("connection closed while waiting for start marker")
 			}
-			// Игнорируем временные ошибки
 			time.Sleep(50 * time.Millisecond)
 			continue
 		}
@@ -146,11 +130,8 @@ func doReadDumpBinary(capacity int, progChan chan<- progressUpdate) ([]byte, err
 		}
 	}
 
-	// === 2️⃣ Читаем РОВНО capacity байт ===
 	buf := make([]byte, 4096)
 	read := 0
-
-	// В doReadDumpBinary(), перед циклом:
 	startTime := time.Now()
 	lastReport := startTime
 
@@ -165,13 +146,11 @@ func doReadDumpBinary(capacity int, progChan chan<- progressUpdate) ([]byte, err
 			return nil, fmt.Errorf("read error at byte %d: %w", read, err)
 		}
 		if n == 0 {
-			break // EOF без ошибки
+			break
 		}
 
-		// Копируем данные
 		dump = append(dump, buf[:n]...)
 		read += n
-		// Внутри цикла, после read += n:
 		now := time.Now()
 		if now.Sub(lastReport) >= 500*time.Millisecond {
 			elapsed := now.Sub(startTime).Seconds()
@@ -185,35 +164,30 @@ func doReadDumpBinary(capacity int, progChan chan<- progressUpdate) ([]byte, err
 			}
 			lastReport = now
 		}
-
 	}
 
-	// === Проверка результата ===
 	if read != capacity {
 		return nil, fmt.Errorf("read %d bytes but expected %d bytes", read, capacity)
 	}
-
-	// Финальное обновление прогресса
 	progChan <- progressUpdate{progress: 1.0, status: "✅ Verifying..."}
-
 	return dump, nil
 }
 
 func VerifyDump(w fyne.Window) {
 	if Port == nil {
-		dialog.ShowError(fmt.Errorf("ERROR: Port not open"), w)
+		dialog.ShowError(fmt.Errorf("port not open"), w)
 		return
 	}
 
 	original, err := tableData.Get()
 	if err != nil || len(original) == 0 {
-		dialog.ShowError(fmt.Errorf("ERROR: No firmware data in memory"), w)
+		dialog.ShowError(fmt.Errorf("no firmware data in memory"), w)
 		return
 	}
 
 	flash, err := CurrentFlash.Get()
 	if err != nil || flash == nil {
-		dialog.ShowError(fmt.Errorf("ERROR: Connect supported NOR first"), w)
+		dialog.ShowError(fmt.Errorf("connect supported NOR first"), w)
 		return
 	}
 
@@ -235,19 +209,18 @@ func VerifyDump(w fyne.Window) {
 	progressDialog.Show()
 
 	progChan := make(chan progressUpdate, 10)
-	resultChan := make(chan []byte, 1) // канал для прочитанных данных
+	resultChan := make(chan []byte, 1)
 
 	go func() {
 		dump, err := doReadDumpBinary(len(original), progChan)
 		if err != nil {
-			resultChan <- nil // сигнал об ошибке
+			resultChan <- nil
 		} else {
 			resultChan <- dump
 		}
 		close(progChan)
 	}()
 
-	// === Обработчик обновлений прогресса (та же логика, что в ReadDumpBinary) ===
 	go func() {
 		for {
 			select {
@@ -258,7 +231,6 @@ func VerifyDump(w fyne.Window) {
 				fyne.Do(func() {
 					progBar.SetValue(upd.progress)
 					if upd.status != "" {
-						// Меняем иконку/текст на "верификационный"
 						statusLabel.SetText(strings.Replace(upd.status, "📥", "🔍", 1))
 					}
 				})
@@ -272,7 +244,6 @@ func VerifyDump(w fyne.Window) {
 		}
 	}()
 
-	// === Ожидание результата и сравнение ===
 	go func() {
 		dump := <-resultChan
 
@@ -281,7 +252,7 @@ func VerifyDump(w fyne.Window) {
 		})
 
 		if dump == nil {
-			dialog.ShowError(fmt.Errorf("ERROR: Failed to read Flash for verification"), w)
+			dialog.ShowError(fmt.Errorf("failed to read Flash for verification"), w)
 			return
 		}
 
@@ -297,7 +268,6 @@ func VerifyDump(w fyne.Window) {
 			}
 		}
 
-		// ✅ Всё совпало
 		msg := fmt.Sprintf("✅ Verification successful!\n%d bytes matched", len(original))
 		log.Println(msg)
 		fyne.Do(func() {

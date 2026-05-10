@@ -16,12 +16,12 @@ import (
 
 func ReadID(w fyne.Window) {
 	if Port == nil {
-		err := fmt.Errorf("Port not open")
+		err := fmt.Errorf("port not open")
 		log.Println(err)
 		dialog.ShowError(err, w)
 		return
 	}
-	// 1. Отправить команду чтения ID
+
 	var err error
 	if _, err = Port.Write([]byte("read_id_fsmc\r\n")); err != nil {
 		log.Println(err)
@@ -51,7 +51,6 @@ func ReadID(w fyne.Window) {
 		return
 	}
 
-	// 2. Парсим "MFR DEV" (например "01 227E")
 	parts := strings.Fields(line)
 	if len(parts) < 4 {
 		err = fmt.Errorf("unexpected format: %s", line)
@@ -96,7 +95,7 @@ func ReadID(w fyne.Window) {
 		return
 	}
 	if flash == nil {
-		err = fmt.Errorf("Unable to identify NOR flash ManID: %s DevID: %s DevID2: %s DevID3: %s",
+		err = fmt.Errorf("unsupported NOR flash ManID: %s DevID: %s DevID2: %s DevID3: %s",
 			manufID, devID, devID2, devID3)
 		log.Println(err)
 		dialog.ShowError(err, w)
@@ -110,14 +109,42 @@ func ReadID(w fyne.Window) {
 		WriteDumpButton.Enable()
 	}
 
-	info := fmt.Sprintf("✔ Detected %s\nTotal size: %d Kbytes", flash.Name, (flash.Capacity / 1024))
-	dialog.ShowInformation("Info", info, w)
+	if err = setTimings(flash, reader); err != nil {
+		log.Println(err)
+		dialog.ShowError(err, w)
+		return
+	}
+	log.Println("FSMC timings applied successfully")
+	info1 := fmt.Sprintf("✔ Detected %s", flash.Name)
+	info2 := fmt.Sprintf("Total size: %d Kbytes", (flash.Capacity / 1024))
+	log.Println(info1)
+	log.Println(info2)
+	dialog.ShowInformation("Info", info1+"\n"+info2, w)
+}
+
+func setTimings(flash *NOR_Flash, reader *bufio.Reader) error {
+	// Sending Timings to STM
+	cfgCmd := fmt.Sprintf("config %d %d %d %d\r\n",
+		flash.Specs.tAS, flash.Specs.tAH, flash.Specs.tWP, flash.Specs.tDS)
+	if _, err := Port.Write([]byte(cfgCmd)); err != nil {
+		return fmt.Errorf("send config: %w", err)
+	}
+
+	// ACK from STM
+	respLine, err := reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("read config ack: %w", err)
+	}
+	respLine = strings.TrimSpace(respLine)
+	if strings.Contains(respLine, "failed") {
+		return fmt.Errorf("device rejected timing config: %s", respLine)
+	}
+	return nil
 }
 
 func WriteFirmware(w fyne.Window) {
-	// === Предварительные проверки (в главном потоке) ===
 	if Port == nil {
-		dialog.ShowError(fmt.Errorf("ERROR: Port not open"), w)
+		dialog.ShowError(fmt.Errorf("port not open"), w)
 		return
 	}
 
@@ -129,7 +156,7 @@ func WriteFirmware(w fyne.Window) {
 
 	flash, err := CurrentFlash.Get()
 	if err != nil || flash == nil {
-		dialog.ShowError(fmt.Errorf("ERROR: Connect supported NOR first"), w)
+		dialog.ShowError(fmt.Errorf("no supported NOR connected"), w)
 		return
 	}
 
@@ -138,7 +165,6 @@ func WriteFirmware(w fyne.Window) {
 		return
 	}
 
-	// === Показываем блокирующее окно с прогрессом ===
 	progBar := widget.NewProgressBar()
 	progBar.Min = 0
 	progBar.Max = 1
@@ -153,17 +179,10 @@ func WriteFirmware(w fyne.Window) {
 	)
 
 	progressDialog := dialog.NewCustomWithoutButtons("Writing Firmware", progressContent, w)
-	progressDialog.SetOnClosed(func() {
-		// Опционально: обработка закрытия окна пользователем
-		// Можно добавить контекст для отмены операции
-	})
 	progressDialog.Resize(fyne.NewSize(400, 150))
 	progressDialog.Show()
 
-	// === Запускаем запись в фоне ===
-	// Канал для обновления прогресса из горутины
-	progChan := make(chan float64, 10) // буферизированный, чтобы не блокировать запись
-	// Канал для результата
+	progChan := make(chan float64, 10)
 	resultChan := make(chan error, 1)
 
 	go func() {
@@ -172,20 +191,17 @@ func WriteFirmware(w fyne.Window) {
 		close(progChan)
 	}()
 
-	// Запускаем цикл обновления прогресс-бара
 	go func() {
 		for {
 			select {
 			case val, ok := <-progChan:
 				if !ok {
-					return // канал закрыт
+					return
 				}
-				// Обновляем UI только через fyne.Do
 				fyne.Do(func() {
 					progBar.SetValue(val)
 				})
-			case <-time.After(5 * time.Minute): // таймаут на всю операцию
-				// На случай если запись зависла
+			case <-time.After(5 * time.Minute):
 				fyne.Do(func() {
 					progressDialog.Dismiss()
 					dialog.ShowError(fmt.Errorf("operation timeout"), w)
@@ -195,8 +211,6 @@ func WriteFirmware(w fyne.Window) {
 		}
 	}()
 
-	// === Ожидание завершения операции ===
-	// (можно вынести в отдельную горутину, если нужно, чтобы окно оставалось отзывчивым)
 	go func() {
 		err := <-resultChan
 
@@ -215,8 +229,6 @@ func WriteFirmware(w fyne.Window) {
 	}()
 }
 
-// doWriteFirmware выполняет запись и отправляет прогресс в канал
-// Можно вызывать из любой горутины
 func doWriteFirmware(data []byte, flash *NOR_Flash, progChan chan<- float64) error {
 	if Port == nil {
 		return fmt.Errorf("port not open")
@@ -236,25 +248,25 @@ func doWriteFirmware(data []byte, flash *NOR_Flash, progChan chan<- float64) err
 		chunkLen := len(chunk)
 		chunkNum := addr/chunkSize + 1
 
-		// 2.1 Команда WRITE_BIN
+		// WRITE_BIN
 		cmd := fmt.Sprintf("WRITE_BIN %x %x\r\n", addr, chunkLen)
 		if _, err := Port.Write([]byte(cmd)); err != nil {
 			return fmt.Errorf("write command failed at 0x%x: %w", addr, err)
 		}
 
-		// 2.2 Ждём "READY"
+		// "READY"
 		if err := waitForString(reader, "READY", readTimeout); err != nil {
 			return fmt.Errorf("no READY at 0x%x: %w", addr, err)
 		}
 
-		// 2.3 Отправляем бинарные данные
+		// Send Data
 		Port.ResetOutputBuffer()
 		Port.ResetInputBuffer()
 		if _, err := Port.Write(chunk); err != nil {
 			return fmt.Errorf("write chunk at 0x%x failed: %w", addr, err)
 		}
 
-		// 2.4 Ждём "WRITE_OK" или ошибку
+		// "WRITE_OK" or ERR
 		response, err := waitForAnyString(reader, []string{"WRITE_OK", "Error"}, writeTimeout)
 		if err != nil {
 			return fmt.Errorf("timeout/error at 0x%x: %w", addr, err)
@@ -263,17 +275,13 @@ func doWriteFirmware(data []byte, flash *NOR_Flash, progChan chan<- float64) err
 			return fmt.Errorf("device reported error at 0x%x", addr)
 		}
 
-		// 🔥 Отправляем прогресс в канал (неблокирующе, благодаря буферу)
 		progress := float64(chunkNum) / float64(totalChunks)
 		select {
 		case progChan <- progress:
-			// отправлено
 		default:
-			// канал переполнен — пропускаем, чтобы не блокировать запись
 		}
 	}
 
-	// 3. Сброс в режим чтения
 	log.Print("🔄 Resetting flash to read mode... ")
 	if _, err := Port.Write([]byte("RESET_FLASH\r\n")); err != nil {
 		return fmt.Errorf("reset command failed: %w", err)
@@ -282,20 +290,16 @@ func doWriteFirmware(data []byte, flash *NOR_Flash, progChan chan<- float64) err
 		return fmt.Errorf("no OK after reset: %w", err)
 	}
 	log.Println("done")
-
-	// Финальное обновление прогресса
 	progChan <- 1.0
 
 	return nil
 }
 
-// waitForString читает строки из reader, пока не встретит заданную подстроку (таймаут в мс).
 func waitForString(reader *bufio.Reader, target string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		line, err := reader.ReadString('\n')
 		if err != nil {
-			// Игнорируем временные ошибки (нет данных) – даём ещё время
 			if strings.Contains(err.Error(), "no data") ||
 				strings.Contains(err.Error(), "timeout") ||
 				err == io.EOF {
@@ -312,8 +316,6 @@ func waitForString(reader *bufio.Reader, target string, timeout time.Duration) e
 	return fmt.Errorf("timeout waiting for '%s'", target)
 }
 
-// waitForAnyString аналогична, но ищет любую из нескольких подстрок.
-// Возвращает найденную строку (или ошибку).
 func waitForAnyString(reader *bufio.Reader, targets []string, timeout time.Duration) (string, error) {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
@@ -368,7 +370,6 @@ func doChipErase() error {
 		return fmt.Errorf("port not open")
 	}
 
-	// Отправляем команду
 	if _, err := Port.Write([]byte("chip_erase\r\n")); err != nil {
 		return fmt.Errorf("send command: %w", err)
 	}
@@ -379,7 +380,6 @@ func doChipErase() error {
 	for time.Now().Before(deadline) {
 		line, err := reader.ReadString('\n')
 		if err != nil {
-			// Игнорируем временные ошибки отсутствия данных
 			if strings.Contains(err.Error(), "no data") ||
 				strings.Contains(err.Error(), "timeout") ||
 				err == io.EOF {
