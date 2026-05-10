@@ -53,7 +53,7 @@ func ReadID(w fyne.Window) {
 
 	// 2. Парсим "MFR DEV" (например "01 227E")
 	parts := strings.Fields(line)
-	if len(parts) < 2 {
+	if len(parts) < 4 {
 		err = fmt.Errorf("unexpected format: %s", line)
 		log.Println(err)
 		dialog.ShowError(err, w)
@@ -61,15 +61,31 @@ func ReadID(w fyne.Window) {
 	}
 	manufID := parts[0]
 	devID := parts[1]
+	devID2 := parts[2]
+	devID3 := parts[3]
 
-	for _, flash := range flashSpecs {
-		if flash.ManufacturerID == manufID && flash.DeviceID == devID {
-			if err = CurrentFlash.Set(&flash); err != nil {
-				log.Println(err)
-				dialog.ShowError(err, w)
-				return
+	if manufID == SpansionManID && devID == SpansionDevID {
+		for _, flash := range SpansionFlashSpecs {
+			if flash.DeviceID2 == devID2 &&
+				flash.DeviceID3 == devID3 {
+				if err = CurrentFlash.Set(&flash); err != nil {
+					log.Println(err)
+					dialog.ShowError(err, w)
+					return
+				}
+				break
 			}
-			break
+		}
+	} else {
+		for _, flash := range FlashSpecs {
+			if flash.ManufacturerID == manufID && flash.DeviceID == devID {
+				if err = CurrentFlash.Set(&flash); err != nil {
+					log.Println(err)
+					dialog.ShowError(err, w)
+					return
+				}
+				break
+			}
 		}
 	}
 
@@ -78,6 +94,12 @@ func ReadID(w fyne.Window) {
 		log.Println(err)
 		dialog.ShowError(err, w)
 		return
+	}
+	if flash == nil {
+		err = fmt.Errorf("Unable to identify NOR flash ManID: %s DevID: %s DevID2: %s DevID3: %s",
+			manufID, devID, devID2, devID3)
+		log.Println(err)
+		dialog.ShowError(err, w)
 	}
 	fyne.Do(func() {
 		ReadDumpButton.Enable()

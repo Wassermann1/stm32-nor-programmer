@@ -13,6 +13,8 @@ type NOR_Flash struct {
 	Name           string
 	ManufacturerID string // hex string without "0x", e.g. "01"
 	DeviceID       string // hex string, e.g. "227E"
+	DeviceID2      string //For spansion memory
+	DeviceID3      string //For spansion memory
 	Capacity       int    //NOR memory size bytes
 	Specs          NOR_TimingSpec
 }
@@ -33,29 +35,65 @@ var CurrentFlash = binding.NewItem[*NOR_Flash](func(n1, n2 *NOR_Flash) bool {
 	return n1.Name == n2.Name
 })
 
-var flashSpecs = map[string]NOR_Flash{
+const (
+	SpansionManID string = "01"
+	SpansionDevID string = "227E"
+)
+
+var SpansionFlashSpecs = map[string]NOR_Flash{
 	"S29GL128P": {
 		Name:           "Spansion S29GL128P",
-		ManufacturerID: "01",
-		DeviceID:       "227E",
+		ManufacturerID: SpansionManID,
+		DeviceID:       SpansionDevID,
+		DeviceID2:      "2221",
+		DeviceID3:      "2201",
 		Capacity:       16 * MB,
 		Specs: NOR_TimingSpec{
 			tAS: 0,
 			tAH: 45,
 			tWP: 35,
-			tDS: 30,
+			tDS: 35,
+		},
+	},
+	"S29GL064N": {
+		Name:           "Spansion S29GL064N",
+		ManufacturerID: SpansionManID,
+		DeviceID:       SpansionDevID,
+		DeviceID2:      "2210",
+		DeviceID3:      "2200",
+		Capacity:       8 * MB,
+		Specs: NOR_TimingSpec{
+			tAS: 0,
+			tAH: 45,
+			tWP: 35,
+			tDS: 35,
+		},
+	},
+}
+
+var FlashSpecs = map[string]NOR_Flash{
+	"S29AL016M": {
+		Name:           "Spansion S29AL016M",
+		ManufacturerID: SpansionManID,
+		DeviceID:       "2249",
+		Capacity:       2 * MB,
+		Specs: NOR_TimingSpec{
+			tAS: 0,
+			tAH: 45,
+			tWP: 35,
+			tDS: 35,
 		},
 	},
 	"MX29LV400BT": {
 		Name:           "Macronix MX29LV400BT",
 		ManufacturerID: "C2",
-		DeviceID:       "B9",
+		DeviceID:       "22B9",
 		Capacity:       512 * KB,
 		Specs: NOR_TimingSpec{
 			tAS: 0,
-			tAH: 0,
+			tAH: 45,
 			tWP: 35,
-			tDS: 30,
+			tDS: 35,
 		},
 	},
 	"ES29LV800DB": {
@@ -65,8 +103,20 @@ var flashSpecs = map[string]NOR_Flash{
 		Capacity:       MB,
 		Specs: NOR_TimingSpec{
 			tAS: 0,
-			tAH: 0,
+			tAH: 45,
 			tWP: 35,
+			tDS: 45,
+		},
+	},
+	"TV005700002": {
+		Name:           "Toshiba TV005700002",
+		ManufacturerID: "98",
+		DeviceID:       "0003",
+		Capacity:       16 * MB,
+		Specs: NOR_TimingSpec{
+			tAS: 0,
+			tAH: 30,
+			tWP: 30,
 			tDS: 30,
 		},
 	},

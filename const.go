@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -28,14 +29,20 @@ var (
 
 	tableData = binding.NewBytes()
 
-	flashImage    *canvas.Image
-	flashLabel    *widget.Label
+	flashImage *canvas.Image
+	flashLabel *widget.Label
+)
+
+var (
+	//go:embed static
+	res           embed.FS
 	flashImageMap = map[string]string{
-		"S29AL016M":            "static/S29AL016M.png",
-		"S29GL064N":            "static/S29GL064N.png",
-		"Spansion S29GL128P":   "static/S29GL128P.png",
-		"Macronix MX29LV400BT": "static/MX29LV400BT.png",
-		"ES29LV800":            "static/ES29LV800.png",
+		"Spansion S29AL016M":              "static/S29AL016M.png",
+		"Spansion S29GL064N":              "static/S29GL064N.png",
+		"Spansion S29GL128P":              "static/S29GL128P.png",
+		"Macronix MX29LV400BT":            "static/MX29LV400BT.png",
+		"Excel Semiconductor ES29LV800DB": "static/ES29LV800.png",
+		"Toshiba TV005700002":             "static/TV005700002.png",
 	}
 )
 
