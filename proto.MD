@@ -21,12 +21,12 @@ This document describes the text-based command protocol used for communication b
 
 ## 📋 Command Reference
 
-### 1. `read_id_fsmc`
+### 1. `READ_ID`
 Read Flash ID via FSMC parallel interface (faster, hardware-specific). Returns extended ID set.
 
 **Request:**
 ```
-read_id_fsmc\r\n
+READ_ID\r\n
 ```
 
 **Response (Success):**
@@ -50,12 +50,12 @@ ERR\r\n
 
 ---
 
-### 2. `read_full <bytes>`
+### 2. `READ_FULL <bytes>`
 Read raw data from Flash memory starting at address `0x00000000`.
 
 **Request:**
 ```
-read_full <bytes>\r\n
+READ_FULL <bytes>\r\n
 ```
 | Parameter | Type | Description | Default |
 |-----------|------|-------------|---------|
@@ -114,12 +114,12 @@ WRITE_BIN <addr> <len>\r\n
 
 ---
 
-### 4. `chip_erase`
+### 4. `CHIP_ERASE`
 Perform a full chip erase operation.
 
 **Request:**
 ```
-chip_erase\r\n
+CHIP_ERASE\r\n
 ```
 
 **Response:**
@@ -134,19 +134,19 @@ chip_erase\r\n
 
 ---
 
-### 5. `config <tAS> <tAH> <tWP> <tDS>`
-Update FSMC bus timing parameters (nanoseconds).
+### 5. `CONFIG <tAS> <tAH> <tDS> <tBT>`
+Update FSMC bus timing parameters. Parameters calculated from selected NOR timings and passed as CPU cycles to STM
 
 **Request:**
 ```
-config <tAS> <tAH> <tWP> <tDS>\r\n
+CONFIG <tAS> <tAH> <tDS> <tBT>\r\n
 ```
 | Parameter | Description | Typical Range |
-|-----------|-------------|--------------|
-| `<tAS>` | Address Setup Time | 0–255 ns |
-| `<tAH>` | Address Hold Time | 0–255 ns |
-| `<tWP>` | Write Pulse Width | 0–255 ns |
-| `<tDS>` | Data Setup Time | 0–255 ns |
+|-----------|-------------|---------------|
+| `<tAS>` | Address Setup Time | 0-15 cycles  |
+| `<tAH>` | Address Hold Time  | 0-15 cecles  |
+| `<tDS>` | Data Setup Time    | 0-15 cycles  |
+| `<tBT>` | Bus Turnaround     | 0–254 cycles |
 
 **Response (Success):**
 ```
@@ -160,7 +160,7 @@ FSMC timing update failed\r\n
 
 **Response (Usage Hint):**
 ```
-Usage: config <tAS_ns> <tAH_ns> <tWP_ns> <tDS_ns>\r\n
+Usage: config <tAS_uibt8> <tAH_uint8> <tDS_uint8> <tBT_uint8>\r\n
 ```
 
 ---
@@ -184,13 +184,13 @@ OK\r\n
 
 ### 🔍 Read Chip ID
 ```
-[Host] → read_id\r\n
-[Device] → Manufacturer: 0x00C2, Device: 0x22B9\r\n
+[Host] → READ_ID\r\n
+[Device] → 0xC2 0x22B9 0x0000 0x0000\r\n
 ```
 
 ### 📥 Full Dump (128 KB)
 ```
-[Host] → read_full 131072\r\n
+[Host] → READ_FULL 131072\r\n
 [Device] → START_DUMP\r\n
 [Device] → <131072 raw bytes>
 [Device] → END_DUMP\r\n
@@ -206,7 +206,7 @@ OK\r\n
 
 ### 🗑️ Erase Chip
 ```
-[Host] → chip_erase\r\n
+[Host] → CHIP_ERASE\r\n
 [Device] → Starting chip erase\r\n
 ... (wait up to 300s) ...
 [Device] → ChipErase SUCCESS\r\n

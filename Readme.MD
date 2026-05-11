@@ -2,6 +2,10 @@
 
 A modern, cross-platform graphical interface for reading, writing, and verifying NOR Flash memory chips. Built with [Go](https://go.dev/) and the [Fyne](https://fyne.io/) UI framework.
 
+## GUI
+*Note that right buttons becomes active at specific triggers. For example - ReadID is inactive while no HW connected, or Read Dump activates only if Read ID compleed with success and supported NOR found.
+![GUI](interface.png)*
+
 > ⚠️ **Important:** This repository contains the **GUI/Frontend only**. It requires compatible hardware programmer and firmware that communicates with the application via a custom serial protocol.
 
 ## 📦 Supported NOR Flash Chips
@@ -36,12 +40,12 @@ Download the latest stable build for your OS from the [Releases](https://github.
 
 1. **Connect Hardware:** Plug the programmer into a USB port and connect the target NOR Flash chip according to the pinout diagram.
 2. **Select Port:** Open the application, choose the correct COM/Serial port from the dropdown, and click **Connect Programmer**.
-3. **Identify Chip:** Click **Read ID**. The application will automatically query the chip, match its signature, and display the model, capacity, and icon.
+3. **Identify Chip:** Click **Read ID**. The application will automatically query the chip, match its signature, and display the model, capacity, and icon. Also Hardvere will be setted to correct timings.
 4. **Memory Operations:**
    - 📥 **Read Dump:** Reads the entire chip into memory and displays it in a live HEX table.
    - 📤 **Write Dump:** Writes a loaded `.bin` file to the Flash memory chunk by chunk.
    - 🔍 **Verify Dump:** Byte-by-byte compares the in-memory firmware with the chip contents. Enabled after a successful write.
-   - 🗑️ **Erase Chip:** Performs a full chip erase operation.
+   - 🗑️ **Erase Chip:** Performs a full chip erase operation. 
 5. **File Management:** Use the `File` menu to open existing `.bin` dumps or save the current memory buffer to disk.
 
 ## 🛠️ Build & Development
