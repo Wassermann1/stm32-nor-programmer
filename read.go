@@ -16,11 +16,13 @@ import (
 
 func ReadDumpBinary(w fyne.Window) {
 	if Port == nil {
+		slog.Error("ERROR reading dump: port not open")
 		dialog.ShowError(fmt.Errorf("port not open"), w)
 		return
 	}
 	flash, err := CurrentFlash.Get()
 	if err != nil || flash == nil {
+		slog.Error("ERROR reading dump: no flash info", "err", err)
 		dialog.ShowError(fmt.Errorf("connect supported NOR first"), w)
 		return
 	}
@@ -66,6 +68,7 @@ func ReadDumpBinary(w fyne.Window) {
 			case <-time.After(10 * time.Minute):
 				fyne.Do(func() {
 					progressDialog.Dismiss()
+					slog.Error("ERROR reading dump: operation timeout")
 					dialog.ShowError(fmt.Errorf("read operation timeout"), w)
 				})
 				return
@@ -80,17 +83,17 @@ func ReadDumpBinary(w fyne.Window) {
 			progressDialog.Dismiss()
 
 			if result.err != nil {
-				slog.Error("ERROR reading dump:", result.err)
+				slog.Error("ERROR reading dump", "err", result.err)
 				dialog.ShowError(result.err, w)
 			} else {
 				if err := tableData.Set(result.data); err != nil {
+					slog.Error("ERROR storing dump", "err", err)
 					dialog.ShowError(fmt.Errorf("error storing dump: %w", err), w)
 					return
 				}
 
-				info := fmt.Sprintf("✅ Binary dump complete!\nRead %d bytes", len(result.data))
-				slog.Info(info)
-				dialog.ShowInformation("Read finished", info, w)
+				slog.Info("Binary dump complete!", "bytes", len(result.data))
+				dialog.ShowInformation("Read finished", fmt.Sprintf("✅ Binary dump complete!\nRead %d bytes", len(result.data)), w)
 			}
 		})
 	}()
@@ -101,7 +104,7 @@ func doReadDumpBinary(capacity int, progChan chan<- progressUpdate) ([]byte, err
 		return nil, fmt.Errorf("port not open")
 	}
 
-	slog.Info("Starting dump, expecting %d bytes of data", capacity)
+	slog.Info("Starting dump", "expected capacity", capacity)
 	reader := bufio.NewReader(Port)
 	dump := make([]byte, 0, capacity)
 	cmd := fmt.Sprintf("READ_FULL %d\r\n", capacity)
@@ -175,24 +178,28 @@ func doReadDumpBinary(capacity int, progChan chan<- progressUpdate) ([]byte, err
 
 func VerifyDump(w fyne.Window) {
 	if Port == nil {
+		slog.Error("ERROR verifying dump: port not open")
 		dialog.ShowError(fmt.Errorf("port not open"), w)
 		return
 	}
 
 	original, err := tableData.Get()
 	if err != nil || len(original) == 0 {
+		slog.Error("ERROR verifying dump: no firmware data in memory")
 		dialog.ShowError(fmt.Errorf("no firmware data in memory"), w)
 		return
 	}
 
 	flash, err := CurrentFlash.Get()
 	if err != nil || flash == nil {
+		slog.Error("ERROR verifying dump: connect supported NOR first")
 		dialog.ShowError(fmt.Errorf("connect supported NOR first"), w)
 		return
 	}
 
-	if len(original) > flash.Capacity {
-		dialog.ShowError(fmt.Errorf("firmware size (%d) exceeds flash capacity (%d)",
+	if len(original) != flash.Capacity {
+		slog.Error("ERROR verifying dump: firmware size does not match flash capacity")
+		dialog.ShowError(fmt.Errorf("firmware size (%d) does not match flash capacity (%d)",
 			len(original), flash.Capacity), w)
 		return
 	}
@@ -237,6 +244,7 @@ func VerifyDump(w fyne.Window) {
 			case <-time.After(10 * time.Minute):
 				fyne.Do(func() {
 					progressDialog.Dismiss()
+					slog.Error("ERROR verifying dump: verification timeout")
 					dialog.ShowError(fmt.Errorf("verification timeout"), w)
 				})
 				return
@@ -260,7 +268,7 @@ func VerifyDump(w fyne.Window) {
 			if original[i] != dump[i] {
 				err := fmt.Errorf("verification failed at 0x%X: expected 0x%02X, got 0x%02X",
 					i, original[i], dump[i])
-				slog.Error("ERROR verifying dump:", err)
+				slog.Error("ERROR verifying dump", "err", err)
 				fyne.Do(func() {
 					dialog.ShowError(err, w)
 				})
@@ -268,10 +276,10 @@ func VerifyDump(w fyne.Window) {
 			}
 		}
 
-		msg := fmt.Sprintf("✅ Verification successful!\n%d bytes matched", len(original))
-		slog.Info(msg)
+		slog.Info("Verification successful!", "bytes", len(original))
 		fyne.Do(func() {
-			dialog.ShowInformation("Success", msg, w)
+			dialog.ShowInformation("Success",
+				fmt.Sprintf("✅ Verification successful!\n%d bytes matched", len(original)), w)
 		})
 	}()
 }

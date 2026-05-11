@@ -14,23 +14,20 @@ import (
 func addToolbar(a fyne.App) *fyne.Container {
 	toolbar := widget.NewToolbar(
 		widget.NewToolbarAction(theme.ViewRefreshIcon(), func() {
-			// Действие для кнопки "Refresh"
 			GetPorts()
 		}),
 		widget.NewToolbarAction(theme.DocumentIcon(), func() {
-			// Действие для кнопки "Open"
-			OpenFile(a.NewWindow("Open File"))
+			OpenFile(a)
 		}),
 		widget.NewToolbarAction(theme.DocumentSaveIcon(), func() {
-			// Действие для кнопки "Save As"
-			SaveAs(a.NewWindow("Save File"), tableData)
+			SaveAs(a, tableData)
 		}),
 		widget.NewToolbarAction(theme.FileTextIcon(), func() { showLog(a) }),
 	)
 
 	p, err := Ports.Get()
 	if err != nil {
-		slog.Error("ERROR getting ports:", err)
+		slog.Error("ERROR getting ports:", "err", err)
 	}
 	portSelector := widget.NewSelect(p, func(value string) {
 		SelectedPortID.Set(value)
@@ -40,10 +37,10 @@ func addToolbar(a fyne.App) *fyne.Container {
 	Ports.AddListener(binding.NewDataListener(func() {
 		newPorts, err := Ports.Get()
 		if err != nil {
-			slog.Error("ERROR getting ports:", err)
+			slog.Error("ERROR getting ports:", "err", err)
 			return
 		}
-		portSelector.Options = newPorts // ← Обновляем опции
+		portSelector.Options = newPorts
 		if portSelector.Selected != "" {
 			found := false
 			for _, opt := range newPorts {
@@ -58,7 +55,6 @@ func addToolbar(a fyne.App) *fyne.Container {
 		}
 		portSelector.Refresh()
 		portSelector.Resize(portSelector.Size())
-		slog.Info("Ports updated")
 	}))
 
 	return container.NewAdaptiveGrid(2, portSelector, toolbar)
@@ -80,7 +76,7 @@ func saveLog(w fyne.Window, data binding.Item[string]) {
 	fileSave := dialog.NewFileSave(
 		func(writer fyne.URIWriteCloser, err error) {
 			if err != nil {
-				slog.Error("file save cancelled or error:", err)
+				slog.Error("file save cancelled or error:", "err", err)
 				return
 			}
 			if writer == nil {
@@ -89,26 +85,26 @@ func saveLog(w fyne.Window, data binding.Item[string]) {
 
 			defer func() {
 				if cerr := writer.Close(); cerr != nil {
-					slog.Error("error closing file:", cerr)
+					slog.Error("error closing file:", "err", cerr)
 					dialog.ShowError(cerr, w)
 				}
 			}()
 
 			data, err := data.Get()
 			if err != nil {
-				slog.Error("error getting data:", err)
+				slog.Error("error getting data:", "err", err)
 				dialog.ShowError(err, w)
 				return
 			}
 
 			_, err = writer.Write([]byte(data))
 			if err != nil {
-				slog.Error("error writing to file:", err)
+				slog.Error("error writing to file:", "err", err)
 				dialog.ShowError(err, w)
 				return
 			}
 
-			slog.Info("Log saved: %s (%d bytes)", writer.URI().Path(), len(data))
+			slog.Info("Log saved", "path", writer.URI().Path(), "size", len(data))
 		}, w,
 	)
 

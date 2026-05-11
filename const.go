@@ -17,7 +17,7 @@ import (
 
 var LogBuffer = binding.NewString()
 
-// io.Writer implementation so slog can write to it
+// io.Writer implementation for slog
 type bindingWriter struct {
 	b binding.String
 }
@@ -87,13 +87,11 @@ var (
 	Actions *fyne.Container
 )
 
-// Структура для передачи прогресса (прогресс + опциональный статус)
 type progressUpdate struct {
 	progress float64
 	status   string
 }
 
-// Структура для результата чтения
 type readResult struct {
 	data []byte
 	err  error

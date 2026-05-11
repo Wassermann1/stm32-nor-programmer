@@ -17,14 +17,14 @@ import (
 func ReadID(w fyne.Window) {
 	if Port == nil {
 		err := fmt.Errorf("port not open")
-		slog.Error("ERROR reading ID:", err)
+		slog.Error("ERROR reading ID", "err", err)
 		dialog.ShowError(err, w)
 		return
 	}
 
 	var err error
 	if _, err = Port.Write([]byte("READ_ID\r\n")); err != nil {
-		slog.Error("ERROR writing to port:", err)
+		slog.Error("ERROR writing to port", "err", err)
 		dialog.ShowError(err, w)
 		return
 	}
@@ -34,7 +34,7 @@ func ReadID(w fyne.Window) {
 	for {
 		line, err = reader.ReadString('\n')
 		if err != nil {
-			slog.Error("ERROR reading from port:", err)
+			slog.Error("ERROR reading from port", "err", err)
 			dialog.ShowError(err, w)
 			return
 		}
@@ -46,7 +46,7 @@ func ReadID(w fyne.Window) {
 	line = strings.TrimSpace(line)
 	if line == "ERR" {
 		err = fmt.Errorf("device returned error or empty")
-		slog.Error("ERROR reading ID:", err)
+		slog.Error("ERROR reading ID", "err", err)
 		dialog.ShowError(err, w)
 		return
 	}
@@ -54,7 +54,7 @@ func ReadID(w fyne.Window) {
 	parts := strings.Fields(line)
 	if len(parts) < 4 {
 		err = fmt.Errorf("unexpected format: %s", line)
-		slog.Error("ERROR reading ID:", err)
+		slog.Error("ERROR reading ID", "err", err)
 		dialog.ShowError(err, w)
 		return
 	}
@@ -67,13 +67,13 @@ func ReadID(w fyne.Window) {
 	if flash == nil {
 		err = fmt.Errorf("unsupported NOR flash ManID: %s DevID: %s DevID2: %s DevID3: %s",
 			manufID, devID, devID2, devID3)
-		slog.Error("ERROR reading ID:", err)
+		slog.Error("ERROR reading ID", "err", err)
 		dialog.ShowError(err, w)
 		return
 	}
 
 	if err = CurrentFlash.Set(flash); err != nil {
-		slog.Error("ERROR setting current flash:", err)
+		slog.Error("ERROR setting current flash", "err", err)
 		dialog.ShowError(err, w)
 		return
 	}
@@ -89,7 +89,7 @@ func ReadID(w fyne.Window) {
 
 	info, err := setTimings(flash, reader)
 	if err != nil {
-		slog.Error("ERROR setting timings:", err)
+		slog.Error("ERROR setting timings", "err", err)
 		dialog.ShowError(err, w)
 		return
 	}
@@ -201,7 +201,7 @@ func WriteFirmware(w fyne.Window) {
 			progressDialog.Dismiss()
 
 			if err != nil {
-				slog.Error("ERROR writing firmware:", err)
+				slog.Error("ERROR writing firmware", "err", err)
 				dialog.ShowError(err, w)
 			} else {
 				slog.Info("Firmware write completed!")
@@ -218,7 +218,8 @@ func doWriteFirmware(data []byte, flash *NOR_Flash, progChan chan<- float64) err
 	}
 
 	totalChunks := (len(data) + chunkSize - 1) / chunkSize
-	slog.Info("📦 Writing %d bytes in %d chunk(s)...", len(data), totalChunks)
+	info := fmt.Sprintf("Starting firmware write: %d bytes in %d chunk(s)", len(data), totalChunks)
+	slog.Info(info)
 
 	reader := bufio.NewReader(Port)
 
@@ -265,14 +266,14 @@ func doWriteFirmware(data []byte, flash *NOR_Flash, progChan chan<- float64) err
 		}
 	}
 
-	slog.Info("🔄 Resetting flash to read mode... ")
+	slog.Info("Resetting flash to read mode... ")
 	if _, err := Port.Write([]byte("RESET_FLASH\r\n")); err != nil {
 		return fmt.Errorf("reset command failed: %w", err)
 	}
 	if err := waitForString(reader, "OK", readTimeout); err != nil {
 		return fmt.Errorf("no OK after reset: %w", err)
 	}
-	slog.Info("done")
+	slog.Info("Write done")
 	progChan <- 1.0
 
 	return nil
@@ -326,7 +327,7 @@ func waitForAnyString(reader *bufio.Reader, targets []string, timeout time.Durat
 }
 
 func ChipErase(w fyne.Window) {
-	slog.Info("🔄 Erasing chip...")
+	slog.Info("Erasing chip...")
 	progress := dialog.NewCustomWithoutButtons("In progress",
 		widget.NewLabel("🔄 Erasing chip...\nPlease wait, this may take up to 5 minutes."), w)
 	progress.Resize(fyne.NewSize(400, 150))
@@ -337,7 +338,7 @@ func ChipErase(w fyne.Window) {
 		fyne.Do(func() {
 			progress.Dismiss()
 			if err != nil {
-				slog.Error("ERROR erasing chip:", err)
+				slog.Error("ERROR erasing chip", "err", err)
 				dialog.ShowError(err, w)
 			} else {
 				info := "✅ Chip erase completed!"

@@ -158,7 +158,7 @@ func updateFlashDisplay() {
 			// 🔥 Загружаем ресурс из embed
 			resource, err := loadEmbeddedImage(path)
 			if err != nil {
-				slog.Warn("could not load image %s: %v", path, err)
+				slog.Warn("could not load image", "path", path, "err", err)
 				flashImage.Resource = theme.NewThemedResource(theme.QuestionIcon())
 			} else {
 				flashImage.Resource = resource
