@@ -2,6 +2,9 @@ package main
 
 import (
 	"embed"
+	"io"
+	"log/slog"
+	"os"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -11,6 +14,33 @@ import (
 	"go.bug.st/serial"
 	"go.bug.st/serial/enumerator"
 )
+
+var LogBuffer = binding.NewString()
+
+// io.Writer implementation so slog can write to it
+type bindingWriter struct {
+	b binding.String
+}
+
+func (w *bindingWriter) Write(p []byte) (n int, err error) {
+	cur, _ := w.b.Get()
+	_ = w.b.Set(cur + string(p))
+	return len(p), nil
+}
+
+func initLogger() {
+	multi := io.MultiWriter(os.Stdout, &bindingWriter{LogBuffer})
+	logger := slog.New(slog.NewTextHandler(multi, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.TimeKey {
+				return slog.String(slog.TimeKey, a.Value.Time().Format("02/01 15:04:05"))
+			}
+			return a
+		},
+	}))
+	slog.SetDefault(logger)
+}
 
 const (
 	chunkSize    = 512

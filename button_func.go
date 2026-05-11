@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -17,14 +17,14 @@ import (
 func ReadID(w fyne.Window) {
 	if Port == nil {
 		err := fmt.Errorf("port not open")
-		log.Println(err)
+		slog.Error("ERROR reading ID:", err)
 		dialog.ShowError(err, w)
 		return
 	}
 
 	var err error
-	if _, err = Port.Write([]byte("read_id_fsmc\r\n")); err != nil {
-		log.Println(err)
+	if _, err = Port.Write([]byte("READ_ID\r\n")); err != nil {
+		slog.Error("ERROR writing to port:", err)
 		dialog.ShowError(err, w)
 		return
 	}
@@ -34,7 +34,7 @@ func ReadID(w fyne.Window) {
 	for {
 		line, err = reader.ReadString('\n')
 		if err != nil {
-			log.Println(err)
+			slog.Error("ERROR reading from port:", err)
 			dialog.ShowError(err, w)
 			return
 		}
@@ -46,7 +46,7 @@ func ReadID(w fyne.Window) {
 	line = strings.TrimSpace(line)
 	if line == "ERR" {
 		err = fmt.Errorf("device returned error or empty")
-		log.Println(err)
+		slog.Error("ERROR reading ID:", err)
 		dialog.ShowError(err, w)
 		return
 	}
@@ -54,7 +54,7 @@ func ReadID(w fyne.Window) {
 	parts := strings.Fields(line)
 	if len(parts) < 4 {
 		err = fmt.Errorf("unexpected format: %s", line)
-		log.Println(err)
+		slog.Error("ERROR reading ID:", err)
 		dialog.ShowError(err, w)
 		return
 	}
@@ -62,44 +62,22 @@ func ReadID(w fyne.Window) {
 	devID := parts[1]
 	devID2 := parts[2]
 	devID3 := parts[3]
+	flash := LookupFlash(manufID, devID, devID2, devID3)
 
-	if manufID == SpansionManID && devID == SpansionDevID {
-		for _, flash := range SpansionFlashSpecs {
-			if flash.DeviceID2 == devID2 &&
-				flash.DeviceID3 == devID3 {
-				if err = CurrentFlash.Set(&flash); err != nil {
-					log.Println(err)
-					dialog.ShowError(err, w)
-					return
-				}
-				break
-			}
-		}
-	} else {
-		for _, flash := range FlashSpecs {
-			if flash.ManufacturerID == manufID && flash.DeviceID == devID {
-				if err = CurrentFlash.Set(&flash); err != nil {
-					log.Println(err)
-					dialog.ShowError(err, w)
-					return
-				}
-				break
-			}
-		}
-	}
-
-	flash, err := CurrentFlash.Get()
-	if err != nil {
-		log.Println(err)
-		dialog.ShowError(err, w)
-		return
-	}
 	if flash == nil {
 		err = fmt.Errorf("unsupported NOR flash ManID: %s DevID: %s DevID2: %s DevID3: %s",
 			manufID, devID, devID2, devID3)
-		log.Println(err)
+		slog.Error("ERROR reading ID:", err)
 		dialog.ShowError(err, w)
+		return
 	}
+
+	if err = CurrentFlash.Set(flash); err != nil {
+		slog.Error("ERROR setting current flash:", err)
+		dialog.ShowError(err, w)
+		return
+	}
+
 	fyne.Do(func() {
 		ReadDumpButton.Enable()
 		EraseChipButton.Enable()
@@ -109,37 +87,42 @@ func ReadID(w fyne.Window) {
 		WriteDumpButton.Enable()
 	}
 
-	if err = setTimings(flash, reader); err != nil {
-		log.Println(err)
+	info, err := setTimings(flash, reader)
+	if err != nil {
+		slog.Error("ERROR setting timings:", err)
 		dialog.ShowError(err, w)
 		return
 	}
-	log.Println("FSMC timings applied successfully")
+	slog.Info("FSMC timings applied successfully")
+	slog.Info(info)
 	info1 := fmt.Sprintf("✔ Detected %s", flash.Name)
 	info2 := fmt.Sprintf("Total size: %d Kbytes", (flash.Capacity / 1024))
-	log.Println(info1)
-	log.Println(info2)
+	slog.Info(info1)
+	slog.Info(info2)
 	dialog.ShowInformation("Info", info1+"\n"+info2, w)
 }
 
-func setTimings(flash *NOR_Flash, reader *bufio.Reader) error {
-	// Sending Timings to STM
-	cfgCmd := fmt.Sprintf("config %d %d %d %d\r\n",
-		flash.Specs.tAS, flash.Specs.tAH, flash.Specs.tWP, flash.Specs.tDS)
-	if _, err := Port.Write([]byte(cfgCmd)); err != nil {
-		return fmt.Errorf("send config: %w", err)
-	}
+func setTimings(flash *NOR_Flash, reader *bufio.Reader) (string, error) {
+	regs, summary := CalcFSMCTimings(&flash.Specs)
+	info := fmt.Sprintf("[timing] %s → %s\n", flash.Name, summary)
 
-	// ACK from STM
-	respLine, err := reader.ReadString('\n')
+	cmd := fmt.Sprintf("CONFIG %d %d %d %d\r\n",
+		regs.AddressSetupTime,
+		regs.AddressHoldTime,
+		regs.DataSetupTime,
+		regs.BusTurnAroundDuration,
+	)
+	if _, err := Port.Write([]byte(cmd)); err != nil {
+		return "", fmt.Errorf("send config: %w", err)
+	}
+	resp, err := reader.ReadString('\n')
 	if err != nil {
-		return fmt.Errorf("read config ack: %w", err)
+		return "", fmt.Errorf("read config ack: %w", err)
 	}
-	respLine = strings.TrimSpace(respLine)
-	if strings.Contains(respLine, "failed") {
-		return fmt.Errorf("device rejected timing config: %s", respLine)
+	if strings.Contains(strings.TrimSpace(resp), "failed") {
+		return "", fmt.Errorf("device rejected timing config: %s", resp)
 	}
-	return nil
+	return info, nil
 }
 
 func WriteFirmware(w fyne.Window) {
@@ -218,10 +201,10 @@ func WriteFirmware(w fyne.Window) {
 			progressDialog.Dismiss()
 
 			if err != nil {
-				log.Println("Write error:", err)
+				slog.Error("ERROR writing firmware:", err)
 				dialog.ShowError(err, w)
 			} else {
-				log.Println("✅ Firmware write completed!")
+				slog.Info("Firmware write completed!")
 				dialog.ShowInformation("Success", "✅ Firmware written successfully!", w)
 				VerifyDumpButton.Enable()
 			}
@@ -235,7 +218,7 @@ func doWriteFirmware(data []byte, flash *NOR_Flash, progChan chan<- float64) err
 	}
 
 	totalChunks := (len(data) + chunkSize - 1) / chunkSize
-	log.Printf("📦 Writing %d bytes in %d chunk(s)...", len(data), totalChunks)
+	slog.Info("📦 Writing %d bytes in %d chunk(s)...", len(data), totalChunks)
 
 	reader := bufio.NewReader(Port)
 
@@ -282,14 +265,14 @@ func doWriteFirmware(data []byte, flash *NOR_Flash, progChan chan<- float64) err
 		}
 	}
 
-	log.Print("🔄 Resetting flash to read mode... ")
+	slog.Info("🔄 Resetting flash to read mode... ")
 	if _, err := Port.Write([]byte("RESET_FLASH\r\n")); err != nil {
 		return fmt.Errorf("reset command failed: %w", err)
 	}
 	if err := waitForString(reader, "OK", readTimeout); err != nil {
 		return fmt.Errorf("no OK after reset: %w", err)
 	}
-	log.Println("done")
+	slog.Info("done")
 	progChan <- 1.0
 
 	return nil
@@ -343,7 +326,7 @@ func waitForAnyString(reader *bufio.Reader, targets []string, timeout time.Durat
 }
 
 func ChipErase(w fyne.Window) {
-	log.Println("🔄 Erasing chip...")
+	slog.Info("🔄 Erasing chip...")
 	progress := dialog.NewCustomWithoutButtons("In progress",
 		widget.NewLabel("🔄 Erasing chip...\nPlease wait, this may take up to 5 minutes."), w)
 	progress.Resize(fyne.NewSize(400, 150))
@@ -354,11 +337,11 @@ func ChipErase(w fyne.Window) {
 		fyne.Do(func() {
 			progress.Dismiss()
 			if err != nil {
-				log.Println(err)
+				slog.Error("ERROR erasing chip:", err)
 				dialog.ShowError(err, w)
 			} else {
 				info := "✅ Chip erase completed!"
-				log.Println(info)
+				slog.Info(info)
 				dialog.ShowInformation("Success", info, w)
 			}
 		})
@@ -370,7 +353,7 @@ func doChipErase() error {
 		return fmt.Errorf("port not open")
 	}
 
-	if _, err := Port.Write([]byte("chip_erase\r\n")); err != nil {
+	if _, err := Port.Write([]byte("CHIP_ERASE\r\n")); err != nil {
 		return fmt.Errorf("send command: %w", err)
 	}
 

@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -80,7 +80,7 @@ func ReadDumpBinary(w fyne.Window) {
 			progressDialog.Dismiss()
 
 			if result.err != nil {
-				log.Println("Read error:", result.err)
+				slog.Error("ERROR reading dump:", result.err)
 				dialog.ShowError(result.err, w)
 			} else {
 				if err := tableData.Set(result.data); err != nil {
@@ -89,7 +89,7 @@ func ReadDumpBinary(w fyne.Window) {
 				}
 
 				info := fmt.Sprintf("✅ Binary dump complete!\nRead %d bytes", len(result.data))
-				log.Println(info)
+				slog.Info(info)
 				dialog.ShowInformation("Read finished", info, w)
 			}
 		})
@@ -101,10 +101,10 @@ func doReadDumpBinary(capacity int, progChan chan<- progressUpdate) ([]byte, err
 		return nil, fmt.Errorf("port not open")
 	}
 
-	log.Printf("Starting dump, expecting %d bytes of data", capacity)
+	slog.Info("Starting dump, expecting %d bytes of data", capacity)
 	reader := bufio.NewReader(Port)
 	dump := make([]byte, 0, capacity)
-	cmd := fmt.Sprintf("read_full %d\r\n", capacity)
+	cmd := fmt.Sprintf("READ_FULL %d\r\n", capacity)
 	if _, err := Port.Write([]byte(cmd)); err != nil {
 		return nil, fmt.Errorf("send command: %w", err)
 	}
@@ -125,7 +125,7 @@ func doReadDumpBinary(capacity int, progChan chan<- progressUpdate) ([]byte, err
 		if strings.Contains(line, "END_DUMP") {
 			Port.ResetInputBuffer()
 			Port.ResetOutputBuffer()
-			log.Println("Empty flash detected")
+			slog.Warn("Empty flash detected")
 			return []byte{}, nil
 		}
 	}
@@ -260,7 +260,7 @@ func VerifyDump(w fyne.Window) {
 			if original[i] != dump[i] {
 				err := fmt.Errorf("verification failed at 0x%X: expected 0x%02X, got 0x%02X",
 					i, original[i], dump[i])
-				log.Println(err)
+				slog.Error("ERROR verifying dump:", err)
 				fyne.Do(func() {
 					dialog.ShowError(err, w)
 				})
@@ -269,7 +269,7 @@ func VerifyDump(w fyne.Window) {
 		}
 
 		msg := fmt.Sprintf("✅ Verification successful!\n%d bytes matched", len(original))
-		log.Println(msg)
+		slog.Info(msg)
 		fyne.Do(func() {
 			dialog.ShowInformation("Success", msg, w)
 		})

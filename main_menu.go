@@ -3,12 +3,13 @@ package main
 import (
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 	"go.bug.st/serial"
@@ -19,14 +20,14 @@ func makeMenu(a fyne.App, w fyne.Window) *fyne.MainMenu {
 
 	// a quit item will be appended to our first (File) menu
 	openFile := fyne.NewMenuItem("Open", func() { OpenFile(w) })
-	saveAsFile := fyne.NewMenuItem("Save As", func() { SaveAs(w) })
+	saveAsFile := fyne.NewMenuItem("Save As", func() { SaveAs(w, tableData) })
 	file := fyne.NewMenu("File", openFile, saveAsFile)
 
 	// Device menu
 	refreshDeviceList := fyne.NewMenuItem("Refresh Device List", func() { GetPorts() })
 	openDevice := fyne.NewMenuItem("Open Device", func() { OpenPort(w) })
 	deviceInfo := fyne.NewMenuItem("Device Info", func() { DeviceInfo(w) })
-	closeDevice := fyne.NewMenuItem("Close Device", nil)
+	closeDevice := fyne.NewMenuItem("Close Device", func() { CloseDevice(w) })
 	device := fyne.NewMenu("Device", refreshDeviceList, openDevice, deviceInfo, closeDevice)
 
 	// Main menu container
@@ -41,15 +42,15 @@ func GetPorts() {
 	var err error
 	PortList, err = enumerator.GetDetailedPortsList()
 	if err != nil {
-		log.Println(err)
+		slog.Error("ERROR getting ports:", err)
 	}
 	if len(PortList) == 0 {
-		log.Print("ERROR: No serial ports found!")
+		slog.Error("ERROR: No serial ports found!")
 	}
 	Ports.Set([]string{})
 	for _, port := range PortList {
 		if port.IsUSB {
-			log.Printf("found port %s\n", port.Product)
+			slog.Info("found port %s\n", port.Product)
 			info := port.Product
 			Ports.Append(info)
 			PortsMap[port.Product] = port
@@ -60,22 +61,22 @@ func GetPorts() {
 func OpenPort(w fyne.Window) {
 	name, err := SelectedPortID.Get()
 	if err != nil {
-		log.Println(err)
+		slog.Error("ERROR getting selected port:", err)
 	}
 	mode := &serial.Mode{BaudRate: 115200}
 	Port, err = serial.Open(PortsMap[name].Name, mode)
 	if err != nil {
-		log.Print(err)
+		slog.Error("ERROR opening port:", err)
 		return
 	}
 	Port.SetReadTimeout(100 * time.Millisecond)
 	info := fmt.Sprintf("Connected to port %s", PortsMap[name].Product)
-	log.Println(info)
+	slog.Info(info)
 	resp, err := ReadResponse(Port)
 	if err != nil {
-		log.Println(err)
+		slog.Error("ERROR reading response:", err)
 	}
-	log.Print(resp)
+	slog.Info(resp)
 	fyne.Do(func() {
 		ReadIDButton.Enable()
 	})
@@ -86,13 +87,13 @@ func OpenPort(w fyne.Window) {
 func DeviceInfo(w fyne.Window) {
 	name, err := SelectedPortID.Get()
 	if err != nil {
-		log.Println(err)
+		slog.Error("ERROR getting selected port:", err)
 	}
 	port := PortsMap[name]
-	log.Printf("Port name:     %s\n", port.Name)
-	log.Printf("Product:       %s\n", port.Product)
-	log.Printf("Serial number: %s\n", port.SerialNumber)
-	log.Printf("VID | PID:     %s | %s\n", port.VID, port.PID)
+	slog.Info("Port name:     %s", port.Name)
+	slog.Info("Product:       %s", port.Product)
+	slog.Info("Serial number: %s", port.SerialNumber)
+	slog.Info("VID | PID:     %s | %s", port.VID, port.PID)
 
 	// Формируем текст информации
 	form := widget.NewForm(
@@ -128,11 +129,11 @@ func ReadResponse(port serial.Port) (string, error) {
 	return out.String(), nil
 }
 
-func SaveAs(w fyne.Window) {
+func SaveAs(w fyne.Window, data binding.Item[[]byte]) {
 	fileSave := dialog.NewFileSave(
 		func(writer fyne.URIWriteCloser, err error) {
 			if err != nil {
-				log.Println("file save cancelled or error:", err)
+				slog.Error("ERROR saving file:", err)
 				return
 			}
 			if writer == nil {
@@ -141,29 +142,30 @@ func SaveAs(w fyne.Window) {
 
 			defer func() {
 				if cerr := writer.Close(); cerr != nil {
-					log.Println("error closing file:", cerr)
+					slog.Error("ERROR closing file:", cerr)
 					dialog.ShowError(cerr, w)
 				}
 			}()
 
-			data, err := tableData.Get()
+			data, err := data.Get()
 			if err != nil {
-				log.Println("error getting dump data:", err)
+				slog.Error("ERROR getting data:", err)
 				dialog.ShowError(err, w)
 				return
 			}
 
 			_, err = writer.Write(data)
 			if err != nil {
-				log.Println("error writing to file:", err)
+				slog.Error("ERROR writing to file:", err)
 				dialog.ShowError(err, w)
 				return
 			}
 
-			log.Printf("✅ Dump saved: %s (%d bytes)", writer.URI().Path(), len(data))
+			slog.Info("Dump saved: %s (%d bytes)", writer.URI().Path(), len(data))
 		}, w,
 	)
 
+	fileSave.SetFileName(".bin")
 	fileSave.Resize(fyne.NewSize(800, 600))
 	fileSave.Show()
 }
@@ -171,7 +173,7 @@ func SaveAs(w fyne.Window) {
 func OpenFile(w fyne.Window) {
 	fileOpen := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
 		if err != nil {
-			log.Println("file save cancelled or error:", err)
+			slog.Error("ERROR opening file:", err)
 			return
 		}
 		if reader == nil {
@@ -179,19 +181,19 @@ func OpenFile(w fyne.Window) {
 		}
 		defer func() {
 			if cerr := reader.Close(); cerr != nil {
-				log.Println("error closing file:", cerr)
+				slog.Error("ERROR closing file:", cerr)
 				dialog.ShowError(cerr, w)
 			}
 		}()
 
 		data, err := io.ReadAll(reader)
 		if err != nil {
-			log.Println("error reading from file:", err)
+			slog.Error("ERROR reading from file:", err)
 			dialog.ShowError(err, w)
 			return
 		}
 		if err = tableData.Set(data); err != nil {
-			log.Println("error setting dump data:", err)
+			slog.Error("ERROR setting dump data:", err)
 			dialog.ShowError(err, w)
 			return
 		}
@@ -210,13 +212,19 @@ func CloseDevice(w fyne.Window) {
 		Port = nil
 		PortList = []*enumerator.PortDetails{}
 		if err := SelectedPortID.Set(""); err != nil {
-			log.Println("error setting dump data:", err)
+			slog.Error("ERROR setting dump data:", err)
 			dialog.ShowError(err, w)
 		}
 		if err := CurrentFlash.Set(nil); err != nil {
-			log.Println("error setting dump data:", err)
+			slog.Error("ERROR setting dump data:", err)
 			dialog.ShowError(err, w)
 		}
+		ConnectProgrammerButton.Disable()
+		ReadIDButton.Disable()
+		ReadDumpButton.Disable()
+		WriteDumpButton.Disable()
+		VerifyDumpButton.Disable()
+		EraseChipButton.Disable()
 	}
 	return
 }

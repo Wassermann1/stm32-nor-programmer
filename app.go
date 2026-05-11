@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -76,6 +76,8 @@ func createFirmwareTable() fyne.CanvasObject {
 
 func main() {
 
+	initLogger()
+
 	a := app.New()
 
 	w := a.NewWindow("NOR Flash Programmer")
@@ -89,7 +91,7 @@ func main() {
 	ConnectProgrammerButton.Disable()
 	ReadIDButton = widget.NewButton("Read ID", func() { ReadID(w) })
 	ReadIDButton.Disable()
-	ReadDumpButton = widget.NewButton("Read Dump", func() { go ReadDumpBinary(w) })
+	ReadDumpButton = widget.NewButton("Read Dump", func() { ReadDumpBinary(w) })
 	ReadDumpButton.Disable()
 	WriteDumpButton = widget.NewButton("Write Dump", func() { WriteFirmware(w) })
 	WriteDumpButton.Disable()
@@ -110,7 +112,7 @@ func main() {
 	split := container.NewHSplit(left, right)
 	split.SetOffset(0.7)
 
-	mainContent := container.NewBorder(addToolbar(), nil, nil, nil, split)
+	mainContent := container.NewBorder(addToolbar(a), nil, nil, nil, split)
 
 	w.SetContent(mainContent)
 
@@ -156,7 +158,7 @@ func updateFlashDisplay() {
 			// 🔥 Загружаем ресурс из embed
 			resource, err := loadEmbeddedImage(path)
 			if err != nil {
-				log.Printf("Warning: could not load image %s: %v", path, err)
+				slog.Warn("could not load image %s: %v", path, err)
 				flashImage.Resource = theme.NewThemedResource(theme.QuestionIcon())
 			} else {
 				flashImage.Resource = resource
