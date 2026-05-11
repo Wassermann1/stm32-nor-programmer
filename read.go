@@ -197,9 +197,9 @@ func VerifyDump(w fyne.Window) {
 		return
 	}
 
-	if len(original) != flash.Capacity {
-		slog.Error("ERROR verifying dump: firmware size does not match flash capacity")
-		dialog.ShowError(fmt.Errorf("firmware size (%d) does not match flash capacity (%d)",
+	if len(original) > flash.Capacity {
+		slog.Error("ERROR verifying dump: firmware size exceeds flash capacity")
+		dialog.ShowError(fmt.Errorf("firmware size (%d) exceeds flash capacity (%d)",
 			len(original), flash.Capacity), w)
 		return
 	}
