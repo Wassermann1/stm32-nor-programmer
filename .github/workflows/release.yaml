@@ -65,7 +65,7 @@ jobs:
           
           fyne package -os ${{ matrix.os }} \
             -name "stm23-nor-programmer" \
-            -icon "stm23-nor-programmer.png"
+            -icon "icon.png"
             -app-version ${VERSION#v} \
             -release
           
