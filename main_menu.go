@@ -51,8 +51,11 @@ func GetPorts() {
 	Ports.Set([]string{})
 	for _, port := range PortList {
 		if port.IsUSB {
-			slog.Info("found port", "product", port.Product)
 			info := port.Product
+			if info == "" {
+				info = port.Name
+			}
+			slog.Info("found port", "port", info)
 			Ports.Append(info)
 			PortsMap[port.Product] = port
 		}
