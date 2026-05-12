@@ -65,14 +65,16 @@ jobs:
           
           fyne package -os ${{ matrix.os }} \
             -name "stm23-nor-programmer" \
-            -icon "icon.png"
             -app-version ${VERSION#v} \
             -release
           
           if [ "${{ matrix.os }}" = "windows" ]; then
             mv "stm23-nor-programmer.exe" "${{ matrix.artifact }}"
           else
-            mv "stm23-nor-programmer.tar.xz" "${{ matrix.artifact }}"
+            tar -xJf stm23-nor-programmer.tar.xz
+            sed -i 's/Icon := "\([^"]*\)"/Icon := "\1.png"/' app/Makefile
+            tar -cJf "${{ matrix.artifact }}" app/
+            rm -rf stm23-nor-programmer.tar.xz app/
           fi
 
       - name: Upload Artifact
