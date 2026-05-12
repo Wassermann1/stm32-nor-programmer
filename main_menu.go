@@ -68,7 +68,11 @@ func OpenPort(w fyne.Window) {
 		slog.Error("ERROR getting selected port:", "err", err)
 	}
 	mode := &serial.Mode{BaudRate: 115200}
-	Port, err = serial.Open(PortsMap[name].Name, mode)
+	p := PortsMap[name].Name
+	if p == "" {
+		p = PortsMap[name].Product
+	}
+	Port, err = serial.Open(p, mode)
 	if err != nil {
 		slog.Error("ERROR opening port:", "err", err)
 		return
