@@ -16,7 +16,7 @@ jobs:
             artifact: stm23-nor-programmer-${{ github.ref_name }}-windows.exe
           - os: linux
             cc: gcc
-            artifact: stm23-nor-programmer-${{ github.ref_name }}-linux
+            artifact: stm23-nor-programmer-${{ github.ref_name }}-linux.tar.xz
 
     steps:
       - name: Checkout
@@ -67,7 +67,13 @@ jobs:
             -name "stm23-nor-programmer" \
             -app-version ${VERSION#v} \
             -release
-
+            
+          if [ "${{ matrix.os }}" = "linux" ]; then
+            echo "Fixing Linux icon bug in Makefile..."
+            # Заменяем Icon := "name" на Icon := "name.png" в Makefile
+            sed -i 's/^Icon := "\(.*\)"/Icon := "\1.png"/' Makefile
+          fi
+          
           echo "Contents of dist/:"
           ls -R 
           
