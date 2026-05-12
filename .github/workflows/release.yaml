@@ -65,17 +65,9 @@ jobs:
           
           fyne package -os ${{ matrix.os }} \
             -name "stm23-nor-programmer" \
+            -icon "stm23-nor-programmer.png"
             -app-version ${VERSION#v} \
             -release
-            
-          if [ "${{ matrix.os }}" = "linux" ]; then
-            echo "Fixing Linux icon bug in Makefile..."
-            # Заменяем Icon := "name" на Icon := "name.png" в Makefile
-            sed -i 's/^Icon := "\(.*\)"/Icon := "\1.png"/' Makefile
-          fi
-          
-          echo "Contents of dist/:"
-          ls -R 
           
           if [ "${{ matrix.os }}" = "windows" ]; then
             mv "stm23-nor-programmer.exe" "${{ matrix.artifact }}"
