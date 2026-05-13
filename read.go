@@ -14,6 +14,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
+// ReadDumpBinary - reading n bytes from NOR memory. n = currently selected flash capacity
 func ReadDumpBinary(w fyne.Window) {
 	if Port == nil {
 		slog.Error("ERROR reading dump: port not open")
@@ -86,7 +87,7 @@ func ReadDumpBinary(w fyne.Window) {
 				slog.Error("ERROR reading dump", "err", result.err)
 				dialog.ShowError(result.err, w)
 			} else {
-				if err := tableData.Set(result.data); err != nil {
+				if err := TableData.Set(result.data); err != nil {
 					slog.Error("ERROR storing dump", "err", err)
 					dialog.ShowError(fmt.Errorf("error storing dump: %w", err), w)
 					return
@@ -176,6 +177,7 @@ func doReadDumpBinary(capacity int, progChan chan<- progressUpdate) ([]byte, err
 	return dump, nil
 }
 
+// VerifyDump - reads NOR dump and compares it with currently open dump
 func VerifyDump(w fyne.Window) {
 	if Port == nil {
 		slog.Error("ERROR verifying dump: port not open")
@@ -183,7 +185,7 @@ func VerifyDump(w fyne.Window) {
 		return
 	}
 
-	original, err := tableData.Get()
+	original, err := TableData.Get()
 	if err != nil || len(original) == 0 {
 		slog.Error("ERROR verifying dump: no firmware data in memory")
 		dialog.ShowError(fmt.Errorf("no firmware data in memory"), w)
