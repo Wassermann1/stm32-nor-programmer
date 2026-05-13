@@ -246,7 +246,7 @@ func CloseDevice(w fyne.Window) {
 		WriteDumpButton.Disable()
 		VerifyDumpButton.Disable()
 		EraseChipButton.Disable()
-		OpenDeviceMenu.Disabled = false
+		OpenDeviceMenu.Disabled = true
 		DeviceInfoMenu.Disabled = true
 		CloseDeviceMenu.Disabled = true
 
