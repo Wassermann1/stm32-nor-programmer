@@ -76,6 +76,7 @@ func ReadID(w fyne.Window) {
 	}
 
 	fyne.Do(func() {
+		DeviceInfoMenu.Disabled = false
 		ReadDumpButton.Enable()
 		EraseChipButton.Enable()
 	})

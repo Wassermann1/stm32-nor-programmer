@@ -179,7 +179,6 @@ func OpenPort(w fyne.Window) {
 	slog.Info(resp)
 	fyne.Do(func() {
 		ReadIDButton.Enable()
-		DeviceInfoMenu.Disabled = false
 		CloseDeviceMenu.Disabled = false
 		OpenDeviceMenu.Disabled = true
 	})
