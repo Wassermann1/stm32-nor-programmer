@@ -57,7 +57,7 @@ func GetPorts() {
 			}
 			slog.Info("found port", "port", info)
 			Ports.Append(info)
-			PortsMap[port.Product] = port
+			PortsMap[info] = port
 		}
 	}
 }
@@ -68,10 +68,8 @@ func OpenPort(w fyne.Window) {
 		slog.Error("ERROR getting selected port:", "err", err)
 	}
 	mode := &serial.Mode{BaudRate: 115200}
-	p := PortsMap[name].Product
-	if p == "" {
-		p = PortsMap[name].Name
-	}
+	p := PortsMap[name].Name
+
 	slog.Info("Opening port", "port", p)
 	Port, err = serial.Open(p, mode)
 	if err != nil {
